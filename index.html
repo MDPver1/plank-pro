@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Plank</title>
+<title>Plank v2.0</title>
 <style>
 :root{
   --bg:#0b0b0b;
@@ -21,33 +21,32 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
 /* центр: цифры */
 .center{display:flex;flex-direction:column;align-items:center;gap:28px}
 #num{
-  font-weight:600;             /* тоньше */
-  font-size:24vw;              /* очень крупные цифры */
+  font-weight:600;
+  font-size:24vw;
   line-height:1;
-  transform:scaleY(1.08);      /* легкая вертикальная вытяжка */
+  transform:scaleY(1.08);
   text-rendering:optimizeLegibility;
 }
 @media (min-aspect-ratio:9/16){ #num{font-size:20vh} }
 
-/* кнопка действия (Start/Stop/Again) */
+/* кнопка действия */
 .action{
   width:116px;height:116px;border-radius:999px;border:2.5px solid var(--brd);
   display:flex;align-items:center;justify-content:center;
   font-size:22px;font-weight:700;color:#fff;background:var(--blue);
-  box-shadow:0 2px 0 rgba(255,255,255,.25) inset;
 }
 .action.stop{background:var(--red)}
 .action.again{background:var(--emerald)}
 .hidden{display:none}
 
-/* Export CSV: правый верх */
+/* Export CSV */
 #export{
   position:fixed; right:16px; top:calc(env(safe-area-inset-top,0) + 12px);
   padding:10px 16px;border:1.5px solid #fff;border-radius:999px;background:transparent;
   color:#fff;font-weight:600
 }
 
-/* оверлей «ощущения» */
+/* оверлей ощущений */
 .sheet{
   position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.55);
 }
@@ -77,7 +76,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
     </div>
   </div>
 
-  <!-- выбор ощущения после финиша -->
+  <!-- выбор ощущения -->
   <div id="feelSheet" class="sheet" role="dialog" aria-modal="true">
     <div class="box">
       <h3>Как ощущалось упражнение?</h3>
@@ -91,7 +90,6 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
 
 <script>
 (() => {
-  // элементы
   const num = document.getElementById('num');
   const btnStart = document.getElementById('btnStart');
   const btnStop  = document.getElementById('btnStop');
@@ -99,29 +97,11 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
   const exportBtn= document.getElementById('export');
   const sheet = document.getElementById('feelSheet');
 
-  // состояние
-  let base = 20;      // стартовое время
+  let base = 20;      
   let left = base;
   let intId = null;
-  let lastBeepFor = null;
 
-  // рендер цифр
   const draw = v => num.textContent = String(v);
-
-  // звук
-  function beep(ms=120,f=880,v=0.05){
-    try{
-      const AC = window.AudioContext || window.webkitAudioContext;
-      const ac = new AC();
-      const osc = ac.createOscillator();
-      const g   = ac.createGain();
-      osc.frequency.value=f;
-      g.gain.value=v;
-      osc.connect(g); g.connect(ac.destination);
-      osc.start(); osc.stop(ac.currentTime + ms/1000);
-      setTimeout(()=>ac.close(), ms+60);
-    }catch(e){}
-  }
 
   // история
   const loadHist = () => {
@@ -133,7 +113,6 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
   function appendHistory(secs, feel){
     const arr = loadHist();
     arr.push({ ts: Date.now(), secs, feel });
-    // ограничим до последних 500 записей
     if (arr.length > 500) arr.splice(0, arr.length - 500);
     saveHist(arr);
   }
@@ -156,10 +135,8 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   }
-
   exportBtn.onclick = exportCSV;
 
-  // управление видимостью кнопок и export
   function setIdleUI(){
     btnStart.classList.remove('hidden');
     btnStop.classList.add('hidden');
@@ -180,32 +157,20 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
     exportBtn.style.display = 'inline-block';
   }
 
-  // таймер
   function start(){
     setRunningUI();
     left = base;
-    lastBeepFor = null;
     draw(left);
 
     clearInterval(intId);
     intId = setInterval(() => {
       left -= 1;
       if (left >= 0) draw(left);
-
-      // бип каждые 10 сек (10,20,30... оставшегося времени)
-      if (left > 0 && left % 10 === 0 && left !== lastBeepFor){
-        lastBeepFor = left;
-        beep();
-      }
-
       if (left <= 0){
         clearInterval(intId);
         finish();
       }
     }, 1000);
-
-    // первый бип сразу, если base кратно 10
-    if (base % 10 === 0) beep();
   }
 
   function stopToIdle(){
@@ -214,30 +179,33 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
   }
 
   function finish(){
-    // тройной бип
-    const b = () => beep();
-    b(); setTimeout(b, 220); setTimeout(b, 440);
-
     setFinishedUI();
-    // окно ощущений
     sheet.style.display = 'grid';
   }
 
-  // обработка выбора ощущения
   sheet.addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-feel]');
     if (!btn) return;
     const feel = btn.getAttribute('data-feel');
     appendHistory(base, feel);
+
+    // адаптация времени
+    let factor = 1;
+    if (feel === 'easy') factor = 1.05;
+    else if (feel === 'hard') factor = 0.95;
+
+    let next = Math.round(base * factor);
+    if (next < 20) next = 20;
+    if (next > 300) next = 300;
+
+    base = next;
     sheet.style.display = 'none';
   });
 
-  // кнопки
   btnStart.onclick = start;
   btnStop.onclick  = stopToIdle;
   btnAgain.onclick = setIdleUI;
 
-  // init
   setIdleUI();
 })();
 </script>
