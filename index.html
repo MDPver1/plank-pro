@@ -1,181 +1,339 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Plank Timer</title>
   <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #000;
-      color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    :root{
+      --bg:#000;
+      --fg:#fff;
+      --primary:#0B74FF;
+      --danger:#E53935;
+      --easy:#2e7d32;
+      --normal:#6b7280;
+      --hard:#d32f2f;
+      --muted:#999;
+      --radius:22px;
+    }
+    html,body{
+      height:100%;
+      margin:0;
+      background:var(--bg);
+      color:var(--fg);
+      font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      touch-action:manipulation;
     }
 
-    .timer {
-      font-size: 20vh;
-      font-weight: 300;
-      line-height: 1.1;
-      transform: scaleY(1.2); /* вытягиваем по вертикали */
-      margin-bottom: 20px;
+    /* Верхняя панель с Export */
+    .topbar{
+      position:fixed;
+      top:env(safe-area-inset-top, 0);
+      left:0; right:0;
+      height:56px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      padding:0 16px;
+      pointer-events:none; /* чтобы не мешать тапам по центру */
+    }
+    .btn-export{
+      pointer-events:auto;
+      background:transparent;
+      color:#eaeaea;
+      border:2px solid #5e5e5e;
+      padding:10px 16px;
+      border-radius:999px;
+      font-size:14px;
+      font-weight:600;
+      backdrop-filter: blur(2px);
     }
 
-    .btn {
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      border: none;
-      font-size: 22px;
-      font-weight: 600;
-      color: #fff;
-      cursor: pointer;
+    /* Центрирование содержимого */
+    .stage{
+      position:relative;
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      justify-content:center; /* по вертикали по центру */
+      align-items:center;     /* по горизонтали по центру */
+      gap:28px;
+      padding: calc(env(safe-area-inset-top, 0) + 10px) 16px 24px;
+      box-sizing:border-box;
     }
 
-    .start { background: #007bff; }
-    .stop { background: #dc3545; }
-    .again { background: #20c997; }
-
-    #exportBtn {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      padding: 8px 16px;
-      border-radius: 20px;
-      border: 1px solid #fff;
-      background: transparent;
-      color: #fff;
-      cursor: pointer;
+    /* Крупная цифра таймера — "предыдущий" размер */
+    .time{
+      font-weight:300;
+      line-height:0.9;
+      letter-spacing:1px;
+      font-variant-numeric: tabular-nums;
+      /* 22vw даёт крупную, но адаптивную цифру; ограничим минимум/максимум */
+      font-size: clamp(120px, 22vw, 240px);
+      transform: translateZ(0);
+      text-align:center;
+      user-select:none;
     }
 
-    #feedback {
-      position: absolute;
-      bottom: 20%;
-      background: rgba(0,0,0,0.9);
-      padding: 20px;
-      border-radius: 12px;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
+    /* Центрированная круглая кнопка */
+    .cta{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:190px;
+      height:190px;
+      border-radius:9999px;
+      border:none;
+      font-size:26px;
+      font-weight:700;
+      letter-spacing:0.3px;
+      color:#fff;
+      background:var(--primary);
+      box-shadow: 0 12px 28px rgba(11,116,255,0.35), inset 0 -6px 18px rgba(0,0,0,0.25);
+      transition: transform .08s ease, filter .2s ease, background .2s ease;
+      will-change: transform;
+      touch-action: manipulation;
+    }
+    .cta:active{ transform: scale(0.98); }
+    .cta.stop{ background:var(--danger); box-shadow: 0 12px 28px rgba(229,57,53,0.35), inset 0 -6px 18px rgba(0,0,0,0.25); }
+
+    /* Оверлей-оценка — "предыдущий идеальный" чистый дизайн */
+    .overlay{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,0.52);
+      backdrop-filter: blur(3px);
+      display:none;
+      align-items:center; justify-content:center;
+      padding:24px;
+      z-index:10;
+    }
+    .card{
+      width:min(520px, 92vw);
+      background: #0e0e10;
+      color:#f5f5f5;
+      border-radius: var(--radius);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+      padding: 22px 22px 18px;
+      position:relative;
+      overflow:hidden;
+      animation: pop .18s ease-out;
+    }
+    @keyframes pop { from{ transform: scale(0.96); opacity:0 } to{ transform: scale(1); opacity:1 } }
+
+    .qtitle{
+      font-size:20px;
+      font-weight:700;
+      margin: 2px 0 14px;
+    }
+    .row{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .pill{
+      flex:1 1 auto;
+      min-width: 120px;
+      border:none;
+      border-radius: 14px;
+      padding:14px 16px;
+      font-size:16px; font-weight:700;
+      color:#fff;
+    }
+    .pill.easy{ background:var(--easy); }
+    .pill.normal{ background:var(--normal); }
+    .pill.hard{ background:var(--hard); }
+
+    /* Подсказка следующего времени после выбора */
+    .next-hint{
+      margin-top: 14px;
+      font-size: 13px;
+      color: #c2c2c2;
     }
 
-    #feedback h3 { margin: 0 0 10px; }
-
-    .fbtn {
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
+    /* Подпись снизу (необязательно) */
+    .hint{
+      color:var(--muted); font-size:12px; margin-top:6px;
+      user-select:none;
     }
-
-    .easy { background: #28a745; color: #fff; }
-    .normal { background: #6c757d; color: #fff; }
-    .hard { background: #dc3545; color: #fff; }
-
   </style>
 </head>
 <body>
-  <div class="app">
-    <div id="timer" class="timer">20</div>
-    <button id="actionBtn" class="btn start">Start</button>
-    <button id="exportBtn">Export CSV</button>
+  <div class="topbar">
+    <button class="btn-export" id="exportBtn">Export CSV</button>
+  </div>
 
-    <div id="feedback">
-      <h3>Как ощущалось упражнение?</h3>
-      <div>
-        <button class="fbtn easy" onclick="saveFeedback('easy')">Легко</button>
-        <button class="fbtn normal" onclick="saveFeedback('normal')">Нормально</button>
-        <button class="fbtn hard" onclick="saveFeedback('hard')">Сложно</button>
+  <main class="stage">
+    <div id="time" class="time">20</div>
+    <button id="cta" class="cta">Start</button>
+    <div class="hint" id="hint"></div>
+  </main>
+
+  <!-- Оверлей-оценка -->
+  <div class="overlay" id="rateOverlay" aria-hidden="true">
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="qtitle">
+      <div id="qtitle" class="qtitle">Как ощущалось упражнение?</div>
+      <div class="row">
+        <button class="pill easy"   data-rate="easy">Легко</button>
+        <button class="pill normal" data-rate="normal">Нормально</button>
+        <button class="pill hard"   data-rate="hard">Сложно</button>
       </div>
+      <div class="next-hint" id="nextHint"></div>
     </div>
   </div>
 
   <script>
-    let duration = 20;
-    let timerEl = document.getElementById('timer');
-    let actionBtn = document.getElementById('actionBtn');
-    let exportBtn = document.getElementById('exportBtn');
-    let feedbackBox = document.getElementById('feedback');
-    let interval;
-    let history = JSON.parse(localStorage.getItem('plankHistory')) || [];
+    // --- Состояние
+    let duration = 20;          // текущее целевое время (сек)
+    let remaining = duration;   // сколько осталось
+    let timerId = null;
+    let running = false;
 
-    function startTimer() {
-      let timeLeft = duration;
-      timerEl.textContent = timeLeft;
-      actionBtn.textContent = "Stop";
-      actionBtn.className = "btn stop";
-      exportBtn.style.display = "none";
+    // Параметры адаптации времени:
+    const STEP_EASY = 2;    // +2 сек
+    const STEP_HARD = 2;    // -2 сек
+    const MIN_SEC = 10, MAX_SEC = 300;
 
-      interval = setInterval(() => {
-        timeLeft--;
-        timerEl.textContent = timeLeft;
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          showFeedback();
-        }
-      }, 1000);
+    // История в localStorage
+    const KEY = "plank_history_v2"; // новая схема
+    const history = JSON.parse(localStorage.getItem(KEY) || "[]");
+
+    // Элементы
+    const $time = document.getElementById('time');
+    const $cta  = document.getElementById('cta');
+    const $hint = document.getElementById('hint');
+    const $overlay = document.getElementById('rateOverlay');
+    const $nextHint = document.getElementById('nextHint');
+    const $exportBtn = document.getElementById('exportBtn');
+
+    function renderTime(value){
+      $time.textContent = String(value);
     }
 
-    function stopTimer() {
-      clearInterval(interval);
-      showFeedback();
+    function setCenterButton(state){
+      // Центрированная кнопка с корректным цветом
+      if(state === 'start'){
+        $cta.textContent = 'Start';
+        $cta.classList.remove('stop');
+      }else{
+        $cta.textContent = 'Stop';
+        $cta.classList.add('stop');
+      }
     }
 
-    function showFeedback() {
-      timerEl.style.display = "none"; // скрываем ноль
-      actionBtn.textContent = "Again";
-      actionBtn.className = "btn again";
-      exportBtn.style.display = "block";
-      feedbackBox.style.display = "flex";
+    function tick(){
+      remaining -= 1;
+      if (remaining <= 0){
+        renderTime(0);
+        stopTimer(false);
+        showRate();
+      } else {
+        renderTime(remaining);
+      }
     }
 
-    function saveFeedback(feel) {
-      let now = new Date().toISOString().split("T")[0];
-      history.push({ date: now, duration, feel });
-      localStorage.setItem('plankHistory', JSON.stringify(history));
-
-      // Алгоритм корректировки
-      if (feel === "easy") duration = Math.min(300, Math.round(duration * 1.05));
-      if (feel === "hard") duration = Math.max(10, Math.round(duration * 0.95));
-
-      // Сброс на новый цикл
-      feedbackBox.style.display = "none";
-      timerEl.style.display = "block";
-      timerEl.textContent = duration;
-      actionBtn.textContent = "Start";
-      actionBtn.className = "btn start";
+    function startTimer(){
+      if (running) return;
+      running = true;
+      setCenterButton('stop');
+      timerId = setInterval(tick, 1000);
     }
 
-    actionBtn.addEventListener("click", () => {
-      if (actionBtn.textContent === "Start") startTimer();
-      else if (actionBtn.textContent === "Stop") stopTimer();
-      else if (actionBtn.textContent === "Again") {
-        timerEl.textContent = duration;
-        actionBtn.textContent = "Start";
-        actionBtn.className = "btn start";
+    function stopTimer(manual=true){
+      if (!running) return;
+      running = false;
+      clearInterval(timerId);
+      timerId = null;
+      setCenterButton('start');
+      if (manual){
+        // При ручной остановке — просто сбрасываем на исходное (без оценки)
+        remaining = duration;
+        renderTime(remaining);
+      }
+    }
+
+    // Показ плашки-оценки (возвращённый прежний чистый стиль)
+    function showRate(){
+      $overlay.style.display = 'flex';
+      $overlay.setAttribute('aria-hidden','false');
+      // На фоне остаётся одна центральная кнопка, ничего не перекрывает по визу
+      $nextHint.textContent = '';
+    }
+    function hideRate(){
+      $overlay.style.display = 'none';
+      $overlay.setAttribute('aria-hidden','true');
+    }
+
+    // Обработка выбора оценки
+    $overlay.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button[data-rate]');
+      if (!btn) return;
+      const rate = btn.dataset.rate; // easy | normal | hard
+      const finished = Number($time.textContent) === 0 ? duration : (duration - remaining);
+
+      // Адаптация времени под следующую планку
+      let next = duration;
+      if (rate === 'easy')  next = Math.min(MAX_SEC, duration + STEP_EASY);
+      if (rate === 'hard')  next = Math.max(MIN_SEC, duration - STEP_HARD);
+      if (rate === 'normal') next = duration;
+
+      // Запись в историю
+      history.push({
+        ts: new Date().toISOString(),
+        planned_sec: duration,
+        done_sec: finished || duration,
+        rate
+      });
+      localStorage.setItem(KEY, JSON.stringify(history));
+
+      // Подсказка пользователю
+      $nextHint.textContent = `Следующая планка: ${next} сек. Нажми Start, когда будешь готов.`;
+
+      // Готовим следующий цикл
+      duration = next;
+      remaining = duration;
+      renderTime(remaining);
+
+      // Закрываем плашку через короткую паузу, чтобы подсказку успели увидеть
+      setTimeout(()=>{ hideRate(); }, 700);
+    });
+
+    // Центр-кнопка
+    $cta.addEventListener('click', ()=>{
+      if (running){
+        stopTimer();
+      } else {
+        // При старте скрываем подсказку
+        $hint.textContent = '';
+        startTimer();
       }
     });
 
-    exportBtn.addEventListener("click", () => {
-      if (history.length === 0) {
-        alert("История пуста!");
-        return;
-      }
-      let csv = "Дата,Время,Ощущение\n" + history.map(h => `${h.date},${h.duration},${h.feel}`).join("\n");
-      let blob = new Blob([csv], { type: "text/csv" });
-      let url = URL.createObjectURL(blob);
-      let a = document.createElement("a");
+    // Экспорт CSV
+    $exportBtn.addEventListener('click', ()=>{
+      const rows = [
+        ["timestamp","planned_sec","done_sec","rate"],
+        ...history.map(r => [r.ts, r.planned_sec, r.done_sec, r.rate])
+      ];
+      const csv = rows.map(r=>r.map(cell=>{
+        const s = String(cell ?? "");
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+      }).join(",")).join("\n");
+
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
       a.href = url;
-      a.download = "plank_history.csv";
+      a.download = `plank_history_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
       URL.revokeObjectURL(url);
     });
+
+    // Инициализация
+    renderTime(remaining);
+    setCenterButton('start');
+    $hint.textContent = 'Совет: после окончания выбери ощущение — время подстроится автоматически.';
   </script>
 </body>
 </html>
