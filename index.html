@@ -1,245 +1,181 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Plank</title>
-<style>
-:root{
-  --bg:#0b0b0b;
-  --txt:#fff;
-  --blue:#0a84ff;
-  --red:#ff453a;
-  --emerald:#23c7a4;
-  --brd:#fff;
-}
-*{box-sizing:border-box}
-html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
-  font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif}
-.app{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plank Timer</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
 
-/* центр: цифры */
-.center{display:flex;flex-direction:column;align-items:center;gap:28px}
-#num{
-  font-weight:600;             /* тоньше */
-  font-size:24vw;              /* очень крупные цифры */
-  line-height:1;
-  transform:scaleY(1.08);      /* легкая вертикальная вытяжка */
-  text-rendering:optimizeLegibility;
-}
-@media (min-aspect-ratio:9/16){ #num{font-size:20vh} }
+    .timer {
+      font-size: 20vh;
+      font-weight: 300;
+      line-height: 1.1;
+      transform: scaleY(1.2); /* вытягиваем по вертикали */
+      margin-bottom: 20px;
+    }
 
-/* кнопка действия (Start/Stop/Again) */
-.action{
-  width:116px;height:116px;border-radius:999px;border:2.5px solid var(--brd);
-  display:flex;align-items:center;justify-content:center;
-  font-size:22px;font-weight:700;color:#fff;background:var(--blue);
-  box-shadow:0 2px 0 rgba(255,255,255,.25) inset;
-}
-.action.stop{background:var(--red)}
-.action.again{background:var(--emerald)}
-.hidden{display:none}
+    .btn {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: none;
+      font-size: 22px;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+    }
 
-/* Export CSV: правый верх */
-#export{
-  position:fixed; right:16px; top:calc(env(safe-area-inset-top,0) + 12px);
-  padding:10px 16px;border:1.5px solid #fff;border-radius:999px;background:transparent;
-  color:#fff;font-weight:600
-}
+    .start { background: #007bff; }
+    .stop { background: #dc3545; }
+    .again { background: #20c997; }
 
-/* оверлей «ощущения» */
-.sheet{
-  position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.55);
-}
-.sheet .box{
-  width:min(520px,90vw); background:#111; border:1px solid #333; border-radius:20px; padding:18px;
-}
-.sheet h3{margin:4px 0 14px; font-size:18px; font-weight:700}
-.row{display:flex; gap:10px}
-.row button{
-  flex:1; padding:14px 12px; border-radius:12px; border:1px solid #333; background:#1a1a1a;
-  color:#fff; font-weight:700
-}
-.row button.ok{border-color:#2e2; background:#143}
-.row button.mid{border-color:#777}
-.row button.hard{border-color:#e33; background:#311}
-</style>
+    #exportBtn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid #fff;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #feedback {
+      position: absolute;
+      bottom: 20%;
+      background: rgba(0,0,0,0.9);
+      padding: 20px;
+      border-radius: 12px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #feedback h3 { margin: 0 0 10px; }
+
+    .fbtn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+
+    .easy { background: #28a745; color: #fff; }
+    .normal { background: #6c757d; color: #fff; }
+    .hard { background: #dc3545; color: #fff; }
+
+  </style>
 </head>
 <body>
-  <button id="export" title="Экспортировать историю CSV">Export CSV</button>
-
   <div class="app">
-    <div class="center">
-      <div id="num">20</div>
-      <button id="btnStart" class="action">Start</button>
-      <button id="btnStop"  class="action stop hidden">Stop</button>
-      <button id="btnAgain" class="action again hidden">Again</button>
-    </div>
-  </div>
+    <div id="timer" class="timer">20</div>
+    <button id="actionBtn" class="btn start">Start</button>
+    <button id="exportBtn">Export CSV</button>
 
-  <!-- выбор ощущения после финиша -->
-  <div id="feelSheet" class="sheet" role="dialog" aria-modal="true">
-    <div class="box">
+    <div id="feedback">
       <h3>Как ощущалось упражнение?</h3>
-      <div class="row">
-        <button class="ok"   data-feel="easy">Легко</button>
-        <button class="mid"  data-feel="normal">Нормально</button>
-        <button class="hard" data-feel="hard">Сложно</button>
+      <div>
+        <button class="fbtn easy" onclick="saveFeedback('easy')">Легко</button>
+        <button class="fbtn normal" onclick="saveFeedback('normal')">Нормально</button>
+        <button class="fbtn hard" onclick="saveFeedback('hard')">Сложно</button>
       </div>
     </div>
   </div>
 
-<script>
-(() => {
-  // элементы
-  const num = document.getElementById('num');
-  const btnStart = document.getElementById('btnStart');
-  const btnStop  = document.getElementById('btnStop');
-  const btnAgain = document.getElementById('btnAgain');
-  const exportBtn= document.getElementById('export');
-  const sheet = document.getElementById('feelSheet');
+  <script>
+    let duration = 20;
+    let timerEl = document.getElementById('timer');
+    let actionBtn = document.getElementById('actionBtn');
+    let exportBtn = document.getElementById('exportBtn');
+    let feedbackBox = document.getElementById('feedback');
+    let interval;
+    let history = JSON.parse(localStorage.getItem('plankHistory')) || [];
 
-  // состояние
-  let base = 20;      // стартовое время
-  let left = base;
-  let intId = null;
-  let lastBeepFor = null;
+    function startTimer() {
+      let timeLeft = duration;
+      timerEl.textContent = timeLeft;
+      actionBtn.textContent = "Stop";
+      actionBtn.className = "btn stop";
+      exportBtn.style.display = "none";
 
-  // рендер цифр
-  const draw = v => num.textContent = String(v);
+      interval = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          showFeedback();
+        }
+      }, 1000);
+    }
 
-  // звук
-  function beep(ms=120,f=880,v=0.05){
-    try{
-      const AC = window.AudioContext || window.webkitAudioContext;
-      const ac = new AC();
-      const osc = ac.createOscillator();
-      const g   = ac.createGain();
-      osc.frequency.value=f;
-      g.gain.value=v;
-      osc.connect(g); g.connect(ac.destination);
-      osc.start(); osc.stop(ac.currentTime + ms/1000);
-      setTimeout(()=>ac.close(), ms+60);
-    }catch(e){}
-  }
+    function stopTimer() {
+      clearInterval(interval);
+      showFeedback();
+    }
 
-  // история
-  const loadHist = () => {
-    try { return JSON.parse(localStorage.getItem('plank_hist')||'[]'); }
-    catch(e){ return []; }
-  };
-  const saveHist = arr => localStorage.setItem('plank_hist', JSON.stringify(arr));
+    function showFeedback() {
+      timerEl.style.display = "none"; // скрываем ноль
+      actionBtn.textContent = "Again";
+      actionBtn.className = "btn again";
+      exportBtn.style.display = "block";
+      feedbackBox.style.display = "flex";
+    }
 
-  function appendHistory(secs, feel){
-    const arr = loadHist();
-    arr.push({ ts: Date.now(), secs, feel });
-    // ограничим до последних 500 записей
-    if (arr.length > 500) arr.splice(0, arr.length - 500);
-    saveHist(arr);
-  }
+    function saveFeedback(feel) {
+      let now = new Date().toISOString().split("T")[0];
+      history.push({ date: now, duration, feel });
+      localStorage.setItem('plankHistory', JSON.stringify(history));
 
-  function exportCSV(){
-    const rows = loadHist();
-    const head = ['datetime','seconds','feeling'];
-    const lines = [head.join(',')].concat(
-      rows.map(r => [
-        new Date(r.ts).toISOString(),
-        r.secs,
-        r.feel||''
-      ].join(','))
-    ).join('\n');
+      // Алгоритм корректировки
+      if (feel === "easy") duration = Math.min(300, Math.round(duration * 1.05));
+      if (feel === "hard") duration = Math.max(10, Math.round(duration * 0.95));
 
-    const blob = new Blob([lines], {type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'plank_history.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }
+      // Сброс на новый цикл
+      feedbackBox.style.display = "none";
+      timerEl.style.display = "block";
+      timerEl.textContent = duration;
+      actionBtn.textContent = "Start";
+      actionBtn.className = "btn start";
+    }
 
-  exportBtn.onclick = exportCSV;
-
-  // управление видимостью кнопок и export
-  function setIdleUI(){
-    btnStart.classList.remove('hidden');
-    btnStop.classList.add('hidden');
-    btnAgain.classList.add('hidden');
-    exportBtn.style.display = 'inline-block';
-    draw(base);
-  }
-  function setRunningUI(){
-    btnStart.classList.add('hidden');
-    btnStop.classList.remove('hidden');
-    btnAgain.classList.add('hidden');
-    exportBtn.style.display = 'none';
-  }
-  function setFinishedUI(){
-    btnStart.classList.add('hidden');
-    btnStop.classList.add('hidden');
-    btnAgain.classList.remove('hidden');
-    exportBtn.style.display = 'inline-block';
-  }
-
-  // таймер
-  function start(){
-    setRunningUI();
-    left = base;
-    lastBeepFor = null;
-    draw(left);
-
-    clearInterval(intId);
-    intId = setInterval(() => {
-      left -= 1;
-      if (left >= 0) draw(left);
-
-      // бип каждые 10 сек (10,20,30... оставшегося времени)
-      if (left > 0 && left % 10 === 0 && left !== lastBeepFor){
-        lastBeepFor = left;
-        beep();
+    actionBtn.addEventListener("click", () => {
+      if (actionBtn.textContent === "Start") startTimer();
+      else if (actionBtn.textContent === "Stop") stopTimer();
+      else if (actionBtn.textContent === "Again") {
+        timerEl.textContent = duration;
+        actionBtn.textContent = "Start";
+        actionBtn.className = "btn start";
       }
+    });
 
-      if (left <= 0){
-        clearInterval(intId);
-        finish();
+    exportBtn.addEventListener("click", () => {
+      if (history.length === 0) {
+        alert("История пуста!");
+        return;
       }
-    }, 1000);
-
-    // первый бип сразу, если base кратно 10
-    if (base % 10 === 0) beep();
-  }
-
-  function stopToIdle(){
-    clearInterval(intId);
-    setIdleUI();
-  }
-
-  function finish(){
-    // тройной бип
-    const b = () => beep();
-    b(); setTimeout(b, 220); setTimeout(b, 440);
-
-    setFinishedUI();
-    // окно ощущений
-    sheet.style.display = 'grid';
-  }
-
-  // обработка выбора ощущения
-  sheet.addEventListener('click', (e)=>{
-    const btn = e.target.closest('button[data-feel]');
-    if (!btn) return;
-    const feel = btn.getAttribute('data-feel');
-    appendHistory(base, feel);
-    sheet.style.display = 'none';
-  });
-
-  // кнопки
-  btnStart.onclick = start;
-  btnStop.onclick  = stopToIdle;
-  btnAgain.onclick = setIdleUI;
-
-  // init
-  setIdleUI();
-})();
-</script>
+      let csv = "Дата,Время,Ощущение\n" + history.map(h => `${h.date},${h.duration},${h.feel}`).join("\n");
+      let blob = new Blob([csv], { type: "text/csv" });
+      let url = URL.createObjectURL(blob);
+      let a = document.createElement("a");
+      a.href = url;
+      a.download = "plank_history.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
 </body>
 </html>
