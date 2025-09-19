@@ -3,40 +3,28 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Plank v2.0</title>
+<title>Plank v2.1</title>
 <style>
 :root{
-  --bg:#0b0b0b;
-  --txt:#fff;
-  --blue:#0a84ff;
-  --red:#ff453a;
-  --emerald:#23c7a4;
-  --brd:#fff;
+  --bg:#0b0b0b; --txt:#fff; --blue:#0a84ff; --red:#ff453a; --emerald:#23c7a4; --brd:#fff;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
   font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif}
 .app{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative}
 
-/* центр: цифры */
+/* центр */
 .center{display:flex;flex-direction:column;align-items:center;gap:28px}
-#num{
-  font-weight:600;
-  font-size:24vw;
-  line-height:1;
-  transform:scaleY(1.08);
-  text-rendering:optimizeLegibility;
-}
+#num{font-weight:600;font-size:24vw;line-height:1;transform:scaleY(1.08)}
 @media (min-aspect-ratio:9/16){ #num{font-size:20vh} }
 
-/* кнопка действия */
+/* кнопки */
 .action{
   width:116px;height:116px;border-radius:999px;border:2.5px solid var(--brd);
   display:flex;align-items:center;justify-content:center;
   font-size:22px;font-weight:700;color:#fff;background:var(--blue);
 }
-.action.stop{background:var(--red)}
-.action.again{background:var(--emerald)}
+.action.stop{background:var(--red)} .action.again{background:var(--emerald)}
 .hidden{display:none}
 
 /* Export CSV */
@@ -47,12 +35,8 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
 }
 
 /* оверлей ощущений */
-.sheet{
-  position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.55);
-}
-.sheet .box{
-  width:min(520px,90vw); background:#111; border:1px solid #333; border-radius:20px; padding:18px;
-}
+.sheet{position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.55)}
+.sheet .box{width:min(520px,90vw); background:#111; border:1px solid #333; border-radius:20px; padding:18px}
 .sheet h3{margin:4px 0 14px; font-size:18px; font-weight:700}
 .row{display:flex; gap:10px}
 .row button{
@@ -90,6 +74,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
 
 <script>
 (() => {
+  // --- DOM
   const num = document.getElementById('num');
   const btnStart = document.getElementById('btnStart');
   const btnStop  = document.getElementById('btnStop');
@@ -97,116 +82,136 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
   const exportBtn= document.getElementById('export');
   const sheet = document.getElementById('feelSheet');
 
-  let base = 20;      
-  let left = base;
-  let intId = null;
+  // --- storage helpers
+  const KEY_BASE = 'plank_base';
+  const KEY_SESS = 'plank_session'; // {state:'idle'|'running'|'awaitFeel', base, startedAt}
+  const KEY_HIST = 'plank_hist';
 
-  const draw = v => num.textContent = String(v);
+  const clamp = v => Math.min(300, Math.max(20, v));
+  const loadBase = () => clamp(parseInt(localStorage.getItem(KEY_BASE) || '20',10));
+  const saveBase = v => localStorage.setItem(KEY_BASE, String(clamp(v)));
 
-  // история
-  const loadHist = () => {
-    try { return JSON.parse(localStorage.getItem('plank_hist')||'[]'); }
-    catch(e){ return []; }
-  };
-  const saveHist = arr => localStorage.setItem('plank_hist', JSON.stringify(arr));
+  const loadSess = () => { try{ return JSON.parse(localStorage.getItem(KEY_SESS)||'{}'); }catch(e){ return {}; } };
+  const saveSess = obj => localStorage.setItem(KEY_SESS, JSON.stringify(obj));
+  const clearSess = () => localStorage.removeItem(KEY_SESS);
 
-  function appendHistory(secs, feel){
+  const loadHist = () => { try{ return JSON.parse(localStorage.getItem(KEY_HIST)||'[]'); }catch(e){ return []; } };
+  const saveHist = arr => localStorage.setItem(KEY_HIST, JSON.stringify(arr));
+  const appendHistory = (secs, feel) => {
     const arr = loadHist();
     arr.push({ ts: Date.now(), secs, feel });
     if (arr.length > 500) arr.splice(0, arr.length - 500);
     saveHist(arr);
-  }
+  };
 
-  function exportCSV(){
+  // --- export
+  exportBtn.onclick = function exportCSV(){
     const rows = loadHist();
     const head = ['datetime','seconds','feeling'];
     const lines = [head.join(',')].concat(
-      rows.map(r => [
-        new Date(r.ts).toISOString(),
-        r.secs,
-        r.feel||''
-      ].join(','))
+      rows.map(r => [new Date(r.ts).toISOString(), r.secs, r.feel||''].join(','))
     ).join('\n');
-
     const blob = new Blob([lines], {type:'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'plank_history.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }
-  exportBtn.onclick = exportCSV;
+    const a = document.createElement('a'); a.href = url; a.download = 'plank_history.csv';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
 
-  function setIdleUI(){
-    btnStart.classList.remove('hidden');
-    btnStop.classList.add('hidden');
-    btnAgain.classList.add('hidden');
-    exportBtn.style.display = 'inline-block';
-    draw(base);
-  }
-  function setRunningUI(){
-    btnStart.classList.add('hidden');
-    btnStop.classList.remove('hidden');
-    btnAgain.classList.add('hidden');
-    exportBtn.style.display = 'none';
-  }
-  function setFinishedUI(){
-    btnStart.classList.add('hidden');
-    btnStop.classList.add('hidden');
-    btnAgain.classList.remove('hidden');
-    exportBtn.style.display = 'inline-block';
+  // --- UI helpers
+  let base = loadBase();
+  let raf = null;
+  let session = loadSess(); // текущая сессия из storage
+
+  const draw = v => num.textContent = String(v);
+  function setIdleUI(){ btnStart.classList.remove('hidden'); btnStop.classList.add('hidden'); btnAgain.classList.add('hidden'); exportBtn.style.display='inline-block'; draw(base); }
+  function setRunningUI(){ btnStart.classList.add('hidden'); btnStop.classList.remove('hidden'); btnAgain.classList.add('hidden'); exportBtn.style.display='none'; }
+  function setFinishedUI(){ btnStart.classList.add('hidden'); btnStop.classList.add('hidden'); btnAgain.classList.remove('hidden'); exportBtn.style.display='inline-block'; }
+
+  // --- таймер через реальное время
+  function loop(){
+    if (!session || session.state!=='running') return;
+    const elapsed = Math.max(0, Math.floor((Date.now() - session.startedAt)/1000));
+    const left = Math.max(session.base - elapsed, 0);
+    draw(left);
+    if (left > 0) { raf = requestAnimationFrame(loop); }
+    else { finish(); }
   }
 
   function start(){
     setRunningUI();
-    left = base;
-    draw(left);
-
-    clearInterval(intId);
-    intId = setInterval(() => {
-      left -= 1;
-      if (left >= 0) draw(left);
-      if (left <= 0){
-        clearInterval(intId);
-        finish();
-      }
-    }, 1000);
+    session = { state:'running', base, startedAt: Date.now() };
+    saveSess(session);
+    draw(base);
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
   }
 
   function stopToIdle(){
-    clearInterval(intId);
+    cancelAnimationFrame(raf);
+    session = { state:'idle', base };
+    saveSess(session);
     setIdleUI();
   }
 
   function finish(){
+    cancelAnimationFrame(raf);
+    draw(0);
     setFinishedUI();
+    // ждём ощущения: фиксируем, что сессия завершилась
+    session = { state:'awaitFeel', base };
+    saveSess(session);
     sheet.style.display = 'grid';
   }
 
+  // --- выбор ощущения + адаптация
   sheet.addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-feel]');
     if (!btn) return;
     const feel = btn.getAttribute('data-feel');
-    appendHistory(base, feel);
 
-    // адаптация времени
+    const lastBase = session?.base ?? base;
+    appendHistory(lastBase, feel);
+
     let factor = 1;
-    if (feel === 'easy') factor = 1.05;
-    else if (feel === 'hard') factor = 0.95;
+    if (feel==='easy') factor = 1.05;
+    else if (feel==='hard') factor = 0.95;
 
-    let next = Math.round(base * factor);
-    if (next < 20) next = 20;
-    if (next > 300) next = 300;
+    base = clamp(Math.round(lastBase * factor)); // «как в математике»
+    saveBase(base);
+    session = { state:'idle', base };
+    saveSess(session);
 
-    base = next;
     sheet.style.display = 'none';
+    setIdleUI();
   });
 
   btnStart.onclick = start;
   btnStop.onclick  = stopToIdle;
   btnAgain.onclick = setIdleUI;
 
-  setIdleUI();
+  // --- восстановление при загрузке
+  (function restore(){
+    base = clamp(session.base ?? base);
+    saveBase(base); // синхронизируем
+    if (session.state === 'running') {
+      setRunningUI();
+      cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+    } else if (session.state === 'awaitFeel') {
+      // таймер уже закончился, ждём оценку
+      draw(0);
+      setFinishedUI();
+      sheet.style.display = 'grid';
+    } else {
+      setIdleUI();
+      session = { state:'idle', base }; saveSess(session);
+    }
+  })();
+
+  // на случай возврата из бэкграунда — обновим кадр
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.visibilityState === 'visible' && session.state==='running'){
+      cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+    }
+  });
 })();
 </script>
 </body>
