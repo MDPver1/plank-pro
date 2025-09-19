@@ -1,171 +1,245 @@
-<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Plank — habit timer</title>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Plank</title>
 <style>
-:root{--bg:#0b0b0b;--txt:#fff;--accent:#0a84ff;--danger:#ff453a;--ok:#23c7a4}
-*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif}
-.app{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.counter{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);font-weight:900;font-size:22vw;line-height:1;letter-spacing:1px}
-@media (min-aspect-ratio:9/16){.counter{font-size:18vh}}
-.controls{position:absolute;bottom:calc(env(safe-area-inset-bottom,0)+92px);left:50%;transform:translateX(-50%);display:flex;gap:18vw;align-items:center}
-.sidebtn{width:72px;height:72px;border-radius:20px;border:3px solid #fff;display:flex;align-items:center;justify-content:center;user-select:none}
-.sidebtn span{font-size:44px;margin-top:-2px}
-.action{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0)+26px);width:112px;height:112px;border-radius:999px;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;background:var(--accent)}
-.action.stop{background:var(--danger)}.action.again{background:var(--ok)}
-.small{position:absolute;top:calc(env(safe-area-inset-top,0)+16px);right:16px;border:1.5px solid #fff;border-radius:999px;background:transparent;color:#fff;font-size:14px;padding:8px 12px}
+:root{
+  --bg:#0b0b0b;
+  --txt:#fff;
+  --blue:#0a84ff;
+  --red:#ff453a;
+  --emerald:#23c7a4;
+  --brd:#fff;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif}
+.app{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative}
 
-/* ВАЖНО: hidden должен побеждать .pre/.feel/.done */
-.hidden{display:none!important}
+/* центр: цифры */
+.center{display:flex;flex-direction:column;align-items:center;gap:28px}
+#num{
+  font-weight:600;             /* тоньше */
+  font-size:24vw;              /* очень крупные цифры */
+  line-height:1;
+  transform:scaleY(1.08);      /* легкая вертикальная вытяжка */
+  text-rendering:optimizeLegibility;
+}
+@media (min-aspect-ratio:9/16){ #num{font-size:20vh} }
 
-.pre{position:absolute;inset:0;display:grid;place-items:center;background:var(--bg);z-index:5}
-.pre h1{margin:0;font-weight:900;color:#fff;font-size:20vw}
-@media (min-aspect-ratio:9/16){.pre h1{font-size:18vh}}
-.done{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);font-weight:900;font-size:14vw;text-align:center;white-space:nowrap}
-.feel{position:absolute;bottom:calc(env(safe-area-inset-bottom,0)+150px);left:50%;transform:translateX(-50%);display:flex;gap:10px}
-.feel button{border:1.5px solid #fff;border-radius:12px;background:transparent;color:#fff;font-size:16px;padding:10px 12px}
-</style></head><body>
-<div class="app" id="app">
-  <button id="btnExport" class="small">Export CSV</button>
+/* кнопка действия (Start/Stop/Again) */
+.action{
+  width:116px;height:116px;border-radius:999px;border:2.5px solid var(--brd);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;font-weight:700;color:#fff;background:var(--blue);
+  box-shadow:0 2px 0 rgba(255,255,255,.25) inset;
+}
+.action.stop{background:var(--red)}
+.action.again{background:var(--emerald)}
+.hidden{display:none}
 
-  <div id="num" class="counter">20</div>
+/* Export CSV: правый верх */
+#export{
+  position:fixed; right:16px; top:calc(env(safe-area-inset-top,0) + 12px);
+  padding:10px 16px;border:1.5px solid #fff;border-radius:999px;background:transparent;
+  color:#fff;font-weight:600
+}
 
-  <div id="controls" class="controls">
-    <div id="minus" class="sidebtn"><span>−</span></div>
-    <div id="plus"  class="sidebtn"><span>+</span></div>
+/* оверлей «ощущения» */
+.sheet{
+  position:fixed; inset:0; display:none; place-items:center; background:rgba(0,0,0,.55);
+}
+.sheet .box{
+  width:min(520px,90vw); background:#111; border:1px solid #333; border-radius:20px; padding:18px;
+}
+.sheet h3{margin:4px 0 14px; font-size:18px; font-weight:700}
+.row{display:flex; gap:10px}
+.row button{
+  flex:1; padding:14px 12px; border-radius:12px; border:1px solid #333; background:#1a1a1a;
+  color:#fff; font-weight:700
+}
+.row button.ok{border-color:#2e2; background:#143}
+.row button.mid{border-color:#777}
+.row button.hard{border-color:#e33; background:#311}
+</style>
+</head>
+<body>
+  <button id="export" title="Экспортировать историю CSV">Export CSV</button>
+
+  <div class="app">
+    <div class="center">
+      <div id="num">20</div>
+      <button id="btnStart" class="action">Start</button>
+      <button id="btnStop"  class="action stop hidden">Stop</button>
+      <button id="btnAgain" class="action again hidden">Again</button>
+    </div>
   </div>
 
-  <button id="btnStart" class="action">Start</button>
-  <button id="btnStop"  class="action stop hidden">Stop</button>
-  <button id="btnAgain" class="action again hidden">Again</button>
-
-  <div id="pre" class="pre hidden"><h1 id="preTxt">Ready</h1></div>
-
-  <div id="done" class="done hidden">Well done!</div>
-
-  <div id="feel" class="feel hidden">
-    <button data-f="easy">Easy</button>
-    <button data-f="normal">Normal</button>
-    <button data-f="hard">Hard</button>
+  <!-- выбор ощущения после финиша -->
+  <div id="feelSheet" class="sheet" role="dialog" aria-modal="true">
+    <div class="box">
+      <h3>Как ощущалось упражнение?</h3>
+      <div class="row">
+        <button class="ok"   data-feel="easy">Легко</button>
+        <button class="mid"  data-feel="normal">Нормально</button>
+        <button class="hard" data-feel="hard">Сложно</button>
+      </div>
+    </div>
   </div>
-</div>
 
 <script>
-(()=>{
-// ---------- UI ----------
-const num=document.getElementById('num');
-const controls=document.getElementById('controls');
-const btnStart=document.getElementById('btnStart');
-const btnStop=document.getElementById('btnStop');
-const btnAgain=document.getElementById('btnAgain');
-const btnExport=document.getElementById('btnExport');
-const pre=document.getElementById('pre'); const preTxt=document.getElementById('preTxt');
-const done=document.getElementById('done');
-const feelBox=document.getElementById('feel');
+(() => {
+  // элементы
+  const num = document.getElementById('num');
+  const btnStart = document.getElementById('btnStart');
+  const btnStop  = document.getElementById('btnStop');
+  const btnAgain = document.getElementById('btnAgain');
+  const exportBtn= document.getElementById('export');
+  const sheet = document.getElementById('feelSheet');
 
-// ---------- STATE ----------
-let base=20; let left=base; let raf=null;
-let sessionStartedAt=0; let sessionTarget=0; let finished=false;
+  // состояние
+  let base = 20;      // стартовое время
+  let left = base;
+  let intId = null;
+  let lastBeepFor = null;
 
-// ---------- HELPERS ----------
-const draw=v=>num.textContent=String(v);
-const show=el=>el.classList.remove('hidden');
-const hide=el=>el.classList.add('hidden');
-draw(base);
+  // рендер цифр
+  const draw = v => num.textContent = String(v);
 
-// ---------- SOUND ----------
-function beep(ms=120,f=880,v=0.06){try{
- const AC=window.AudioContext||window.webkitAudioContext; const ac=new AC();
- const o=ac.createOscillator(), g=ac.createGain(); o.frequency.value=f; g.gain.value=v;
- o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+ms/1000);
- setTimeout(()=>ac.close(),ms+60);
-}catch(e){}}
+  // звук
+  function beep(ms=120,f=880,v=0.05){
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ac = new AC();
+      const osc = ac.createOscillator();
+      const g   = ac.createGain();
+      osc.frequency.value=f;
+      g.gain.value=v;
+      osc.connect(g); g.connect(ac.destination);
+      osc.start(); osc.stop(ac.currentTime + ms/1000);
+      setTimeout(()=>ac.close(), ms+60);
+    }catch(e){}
+  }
 
-// ---------- STORAGE ----------
-const KEY="plank.history.v1";
-function readDB(){try{const raw=localStorage.getItem(KEY); if(!raw) return {v:1,items:[],lastSessionISO:null}; const db=JSON.parse(raw); if(!db.items) db.items=[]; return db;}catch{return {v:1,items:[],lastSessionISO:null}}}
-function writeDB(db){try{localStorage.setItem(KEY,JSON.stringify(db));}catch{}}
-function addRecord(rec){const db=readDB(); db.items.push(rec); if(db.items.length>1000) db.items=db.items.slice(-1000); db.lastSessionISO=new Date(rec.ts).toISOString().slice(0,10); writeDB(db);}
-function exportCSV(){
-  const {items}=readDB(); const rows=[["ts","date","target","done","ok","aborted","feeling"]];
-  for(const x of items){const d=new Date(x.ts).toISOString(); rows.push([x.ts,d,x.target,x.done,x.ok,x.aborted,x.feeling||""]); }
-  const csv=rows.map(r=>r.join(",")).join("\n");
-  const blob=new Blob([csv],{type:"text/csv"}); const url=URL.createObjectURL(blob);
-  const a=document.createElement("a"); a.href=url; a.download="plank_history.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-}
-
-// ---------- DATES / MISSED ----------
-const DAY=24*60*60*1000;
-const todayISO=()=>new Date().toISOString().slice(0,10);
-function diffDays(aISO,bISO){if(!aISO||!bISO)return 0; const a=new Date(aISO+"T00:00:00Z"),b=new Date(bISO+"T00:00:00Z"); return Math.floor((b-a)/DAY);}
-function calcMissedDays(){const db=readDB(); if(!db.lastSessionISO)return 0; const d=diffDays(db.lastSessionISO,todayISO()); return Math.max(0,d-1);}
-
-// ---------- ALGO ----------
-function applyDetraining(cur,miss){const k=Math.max(0.5,1-0.05*Math.max(0,miss)); return cur*k;}
-function applyFeeling(sec,feeling){const k=feeling==="easy"?1.05:feeling==="hard"?0.95:1.0; return sec*k;}
-function clampRound(sec){let t=Math.round(sec); if(t<10)t=10; if(t>300)t=300; return t;}
-function computeNextPlankTime(currentSec,feeling,missedOverride){
-  const missed=(typeof missedOverride==="number")?missedOverride:calcMissedDays();
-  let next=applyDetraining(currentSec,missed); next=applyFeeling(next,feeling); return clampRound(next);
-}
-function logSession({target,done,feeling="normal",aborted=false}){const ok=!aborted&&done>=target; addRecord({ts:Date.now(),target,done,ok,aborted,feeling});}
-
-// ---------- CONTROLS ----------
-document.getElementById('minus').onclick=()=>{ if(!btnStart.classList.contains('hidden')){ base=Math.max(10,base-10); draw(base);} };
-document.getElementById('plus').onclick =()=>{ if(!btnStart.classList.contains('hidden')){ base=Math.min(300,base+10); draw(base);} };
-btnExport.onclick=exportCSV;
-
-// ---------- PRECOUNT ----------
-function runPreThenStart(){
-  preTxt.textContent="Ready"; show(pre);
-  setTimeout(()=>preTxt.textContent="Set",800);
-  setTimeout(()=>preTxt.textContent="Go!",1600);
-  setTimeout(()=>{ hide(pre); startTimer(); },2200);
-}
-
-// ---------- TIMER ----------
-function startTimer(){
-  sessionStartedAt=Date.now(); sessionTarget=base; finished=false;
-  left=base; draw(left);
-  hide(btnStart); show(btnStop); hide(done); hide(feelBox);
-  controls.style.display='none';
-
-  let t0=performance.now(), prev10=left;
-  const loop=(t)=>{
-    const elapsed=Math.min((t-t0)/1000, base);
-    const leftNow=Math.max(base-Math.floor(elapsed),0);
-    if(leftNow!==left){left=leftNow; draw(left);}
-    if(left>0 && left%10===0 && left!==prev10){prev10=left; beep();}
-    if(elapsed<base){raf=requestAnimationFrame(loop);} else {finish();}
+  // история
+  const loadHist = () => {
+    try { return JSON.parse(localStorage.getItem('plank_hist')||'[]'); }
+    catch(e){ return []; }
   };
-  raf=requestAnimationFrame(loop);
-}
-function finish(){
-  finished=true;
-  hide(btnStop);
-  const b=()=>beep(); b(); setTimeout(b,220); setTimeout(b,440);
-  show(done); show(btnAgain); show(feelBox);
-}
-function resetToStart(){
-  if(raf) cancelAnimationFrame(raf);
-  show(btnStart); hide(btnStop); hide(btnAgain); hide(pre); hide(done); hide(feelBox);
-  controls.style.display=''; draw(base);
-}
+  const saveHist = arr => localStorage.setItem('plank_hist', JSON.stringify(arr));
 
-// ---------- FEELING ----------
-feelBox.addEventListener('click', (e)=>{
-  const btn=e.target.closest('button'); if(!btn) return;
-  const feeling=btn.dataset.f; // 'easy'|'normal'|'hard'
-  const doneSec = finished ? sessionTarget : (sessionTarget-left);
-  const aborted = !finished;
-  logSession({target:sessionTarget,done:doneSec,feeling,aborted});
-  base = computeNextPlankTime(base, feeling);
-  resetToStart();
-});
+  function appendHistory(secs, feel){
+    const arr = loadHist();
+    arr.push({ ts: Date.now(), secs, feel });
+    // ограничим до последних 500 записей
+    if (arr.length > 500) arr.splice(0, arr.length - 500);
+    saveHist(arr);
+  }
 
-// ---------- BUTTONS ----------
-btnStart.onclick=runPreThenStart;
-btnStop.onclick =()=>{ const doneSec=sessionTarget-left; logSession({target:sessionTarget,done:doneSec,feeling:"hard",aborted:true}); resetToStart(); };
-btnAgain.onclick=resetToStart;
+  function exportCSV(){
+    const rows = loadHist();
+    const head = ['datetime','seconds','feeling'];
+    const lines = [head.join(',')].concat(
+      rows.map(r => [
+        new Date(r.ts).toISOString(),
+        r.secs,
+        r.feel||''
+      ].join(','))
+    ).join('\n');
 
+    const blob = new Blob([lines], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'plank_history.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  exportBtn.onclick = exportCSV;
+
+  // управление видимостью кнопок и export
+  function setIdleUI(){
+    btnStart.classList.remove('hidden');
+    btnStop.classList.add('hidden');
+    btnAgain.classList.add('hidden');
+    exportBtn.style.display = 'inline-block';
+    draw(base);
+  }
+  function setRunningUI(){
+    btnStart.classList.add('hidden');
+    btnStop.classList.remove('hidden');
+    btnAgain.classList.add('hidden');
+    exportBtn.style.display = 'none';
+  }
+  function setFinishedUI(){
+    btnStart.classList.add('hidden');
+    btnStop.classList.add('hidden');
+    btnAgain.classList.remove('hidden');
+    exportBtn.style.display = 'inline-block';
+  }
+
+  // таймер
+  function start(){
+    setRunningUI();
+    left = base;
+    lastBeepFor = null;
+    draw(left);
+
+    clearInterval(intId);
+    intId = setInterval(() => {
+      left -= 1;
+      if (left >= 0) draw(left);
+
+      // бип каждые 10 сек (10,20,30... оставшегося времени)
+      if (left > 0 && left % 10 === 0 && left !== lastBeepFor){
+        lastBeepFor = left;
+        beep();
+      }
+
+      if (left <= 0){
+        clearInterval(intId);
+        finish();
+      }
+    }, 1000);
+
+    // первый бип сразу, если base кратно 10
+    if (base % 10 === 0) beep();
+  }
+
+  function stopToIdle(){
+    clearInterval(intId);
+    setIdleUI();
+  }
+
+  function finish(){
+    // тройной бип
+    const b = () => beep();
+    b(); setTimeout(b, 220); setTimeout(b, 440);
+
+    setFinishedUI();
+    // окно ощущений
+    sheet.style.display = 'grid';
+  }
+
+  // обработка выбора ощущения
+  sheet.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-feel]');
+    if (!btn) return;
+    const feel = btn.getAttribute('data-feel');
+    appendHistory(base, feel);
+    sheet.style.display = 'none';
+  });
+
+  // кнопки
+  btnStart.onclick = start;
+  btnStop.onclick  = stopToIdle;
+  btnAgain.onclick = setIdleUI;
+
+  // init
+  setIdleUI();
 })();
 </script>
-</body></html>
+</body>
+</html>
